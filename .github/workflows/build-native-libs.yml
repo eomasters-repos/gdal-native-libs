@@ -67,6 +67,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
 
           $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
           if (-not $vcpkgRoot) {
@@ -85,6 +86,16 @@ jobs:
           & $vcpkgExe install proj:x64-windows sqlite3[rtree]:x64-windows
 
           "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "VCPKG_INSTALLED=$vcpkgRoot\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          $projLib = "$vcpkgRoot\installed\x64-windows\lib\proj.lib"
+          $projInclude = "$vcpkgRoot\installed\x64-windows\include\proj.h"
+          if (-not (Test-Path $projLib)) {
+            throw "PROJ library not found at $projLib after vcpkg install"
+          }
+          if (-not (Test-Path $projInclude)) {
+            throw "PROJ header not found at $projInclude after vcpkg install"
+          }
 
       - name: Setup MSVC developer environment (Windows)
         if: runner.os == 'Windows'
@@ -171,6 +182,8 @@ jobs:
             "-DBUILD_CSHARP_BINDINGS=OFF",
             "-DGDAL_JAVA_INSTALL_DIR=share/java",
             "-DGDAL_JAVA_JNI_INSTALL_DIR=lib/jni",
+            "-DPROJ_INCLUDE_DIR=$env:VCPKG_INSTALLED\include",
+            "-DPROJ_LIBRARY=$env:VCPKG_INSTALLED\lib\proj.lib",
             "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake",
             "-DVCPKG_TARGET_TRIPLET=x64-windows"
           )
