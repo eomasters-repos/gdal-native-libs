@@ -228,6 +228,11 @@ jobs:
           rm -rf "${PACKAGE_DIR}/lib/pkgconfig"
           cp "$GDAL_PC_SOURCE" "${PACKAGE_DIR}/lib/gdal.pc"
 
+          if [[ -f "${INSTALL_DIR}/bin/gdal-config" ]]; then
+            cp "${INSTALL_DIR}/bin/gdal-config" "${PACKAGE_DIR}/lib/gdal-config"
+            chmod +x "${PACKAGE_DIR}/lib/gdal-config"
+          fi
+
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
           tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib
 
@@ -246,11 +251,28 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path "$packageDir\lib" | Out-Null
 
-          if (-not (Test-Path "$installDir\lib")) {
-            throw "Expected install\\lib to exist, but it was not found."
+          $copiedNativeFiles = $false
+          if (Test-Path "$installDir\lib") {
+            Copy-Item -Path "$installDir\lib\*" -Destination "$packageDir\lib" -Recurse -Force
+            $copiedNativeFiles = $true
+          }
+          if (Test-Path "$installDir\bin") {
+            Copy-Item -Path "$installDir\bin\*" -Destination "$packageDir\lib" -Recurse -Force
+            $copiedNativeFiles = $true
+          }
+          if (-not $copiedNativeFiles) {
+            throw "Neither install\\lib nor install\\bin exists. Nothing to package."
           }
 
-          Copy-Item -LiteralPath "$installDir\lib\*" -Destination "$packageDir\lib" -Recurse -Force
+          if ((-not (Test-Path "$packageDir\lib\gdal-config")) -and (Test-Path "$installDir\bin\gdal-config")) {
+            Copy-Item -LiteralPath "$installDir\bin\gdal-config" -Destination "$packageDir\lib\gdal-config" -Force
+          }
+          if ((-not (Test-Path "$packageDir\lib\gdal-config.bat")) -and (Test-Path "$installDir\bin\gdal-config.bat")) {
+            Copy-Item -LiteralPath "$installDir\bin\gdal-config.bat" -Destination "$packageDir\lib\gdal-config.bat" -Force
+          }
+          if ((-not (Test-Path "$packageDir\lib\gdal-config.exe")) -and (Test-Path "$installDir\bin\gdal-config.exe")) {
+            Copy-Item -LiteralPath "$installDir\bin\gdal-config.exe" -Destination "$packageDir\lib\gdal-config.exe" -Force
+          }
 
           $gdalPcSource = $null
           if (Test-Path "$installDir\lib\pkgconfig\gdal.pc") {

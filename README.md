@@ -59,6 +59,7 @@ Each archive is repackaged as a minimal runtime bundle and contains only:
 
 - `lib/` (native GDAL runtime and related library files from install `lib`)
 - `lib/gdal.pc`
+- `lib/gdal-config`
 
 ## Java runtime notes
 
