@@ -220,8 +220,8 @@ jobs:
           set -euxo pipefail
           TAG="${{ inputs.gdal_tag }}"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release delete "$TAG" --yes --cleanup-tag
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           else
             echo "No existing release for ${TAG}"
           fi
@@ -247,4 +247,4 @@ jobs:
           TAG="${{ inputs.gdal_tag }}"
           TITLE="GDAL Native Libs ${TAG}"
 
-          gh release create "$TAG" dist/* --title "$TITLE" --notes "Automated GDAL native library build for ${TAG}"
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "Automated GDAL native library build for ${TAG}"
