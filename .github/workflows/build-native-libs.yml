@@ -82,7 +82,7 @@ jobs:
             & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
           }
 
-          & $vcpkgExe install proj:x64-windows
+          & $vcpkgExe install proj:x64-windows sqlite3[rtree]:x64-windows
 
           "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
 
