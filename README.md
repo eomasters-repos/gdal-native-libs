@@ -22,6 +22,8 @@ The build is started manually via GitHub Actions (`workflow_dispatch`) with:
 Important:
 - The workflow currently supports CMake builds for `GDAL >= 3.5.0`.
 - Java bindings are always built.
+- Python bindings are not built.
+- C# bindings are not built.
 - No additional GDAL drivers are enabled explicitly in this repository.
 
 ## Build dependencies
