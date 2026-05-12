@@ -51,8 +51,9 @@ The workflow has three stages:
 Each platform produces one archive:
 
 - `gdal-<tag>-linux-x64.tar.gz`
+- `gdal-<tag>-linux-arm64.tar.gz`
 - `gdal-<tag>-macos-arm64.tar.gz`
-- `gdal-<tag>-windows-x64.tar.gz`
+- `gdal-<tag>-windows-x64.zip`
 
 Each archive is repackaged as a minimal runtime bundle and contains only:
 

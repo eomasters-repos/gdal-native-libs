@@ -194,7 +194,8 @@ jobs:
           cmake --build $buildDir --config Release --parallel
           cmake --install $buildDir --config Release
 
-      - name: Package native libs
+      - name: Package native libs (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euxo pipefail
@@ -230,11 +231,51 @@ jobs:
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
           tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib
 
+      - name: Package native libs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installDir = "$env:GITHUB_WORKSPACE\install"
+          $packageDir = "$env:GITHUB_WORKSPACE\package"
+          $distDir = "$env:GITHUB_WORKSPACE\dist"
+
+          New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+          if (Test-Path $packageDir) {
+            Remove-Item -LiteralPath $packageDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path "$packageDir\lib" | Out-Null
+
+          if (-not (Test-Path "$installDir\lib")) {
+            throw "Expected install\\lib to exist, but it was not found."
+          }
+
+          Copy-Item -LiteralPath "$installDir\lib\*" -Destination "$packageDir\lib" -Recurse -Force
+
+          $gdalPcSource = $null
+          if (Test-Path "$installDir\lib\pkgconfig\gdal.pc") {
+            $gdalPcSource = "$installDir\lib\pkgconfig\gdal.pc"
+          } elseif (Test-Path "$installDir\share\pkgconfig\gdal.pc") {
+            $gdalPcSource = "$installDir\share\pkgconfig\gdal.pc"
+          }
+
+          if (-not $gdalPcSource) {
+            throw "gdal.pc not found in install tree."
+          }
+
+          if (Test-Path "$packageDir\lib\pkgconfig") {
+            Remove-Item -LiteralPath "$packageDir\lib\pkgconfig" -Recurse -Force
+          }
+          Copy-Item -LiteralPath $gdalPcSource -Destination "$packageDir\lib\gdal.pc" -Force
+
+          $archive = "gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.zip"
+          Compress-Archive -Path "$packageDir\lib" -DestinationPath "$distDir\$archive" -Force
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}
-          path: dist/*.tar.gz
+          path: dist/*
           if-no-files-found: error
 
   reset-release-tag:
