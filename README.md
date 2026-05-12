@@ -10,7 +10,7 @@ The workflow downloads the release source archive for the given tag and builds w
 | OS      | x64 | ARM |
 |---------|-----|-----|
 | Windows | ✅  | ❌  |
-| Linux   | ✅  | ❌  |
+| Linux   | ✅  | ✅  |
 | macOS   | ❌  | ✅  |
 
 ## Workflow trigger
