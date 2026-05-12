@@ -54,13 +54,10 @@ Each platform produces one archive:
 - `gdal-<tag>-macos-arm64.tar.gz`
 - `gdal-<tag>-windows-x64.tar.gz`
 
-The archive contains the CMake install tree from the GDAL build, typically including:
+Each archive is repackaged as a minimal runtime bundle and contains only:
 
-- `lib/` (native GDAL libs)
-- `bin/` (if produced by platform/build)
-- `include/` (headers)
-- `share/java` (Java artifacts)
-- `lib/jni` (JNI artifacts)
+- `lib/` (native GDAL runtime and related library files from install `lib`)
+- `lib/gdal.pc`
 
 ## Java runtime notes
 

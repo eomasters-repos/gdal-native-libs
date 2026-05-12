@@ -199,8 +199,36 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p dist
+          PACKAGE_DIR="${GITHUB_WORKSPACE}/package"
+          INSTALL_DIR="${GITHUB_WORKSPACE}/install"
+
+          rm -rf "$PACKAGE_DIR"
+          mkdir -p "$PACKAGE_DIR/lib"
+
+          if [[ ! -d "${INSTALL_DIR}/lib" ]]; then
+            echo "Expected install/lib to exist, but it was not found."
+            exit 1
+          fi
+
+          cp -a "${INSTALL_DIR}/lib/." "${PACKAGE_DIR}/lib/"
+
+          GDAL_PC_SOURCE=""
+          if [[ -f "${INSTALL_DIR}/lib/pkgconfig/gdal.pc" ]]; then
+            GDAL_PC_SOURCE="${INSTALL_DIR}/lib/pkgconfig/gdal.pc"
+          elif [[ -f "${INSTALL_DIR}/share/pkgconfig/gdal.pc" ]]; then
+            GDAL_PC_SOURCE="${INSTALL_DIR}/share/pkgconfig/gdal.pc"
+          fi
+
+          if [[ -z "$GDAL_PC_SOURCE" ]]; then
+            echo "gdal.pc not found in install tree."
+            exit 1
+          fi
+
+          rm -rf "${PACKAGE_DIR}/lib/pkgconfig"
+          cp "$GDAL_PC_SOURCE" "${PACKAGE_DIR}/lib/gdal.pc"
+
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
-          tar -C "${GITHUB_WORKSPACE}/install" -czf "dist/${ARCHIVE}" .
+          tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
