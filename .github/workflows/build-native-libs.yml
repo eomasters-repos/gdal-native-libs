@@ -48,18 +48,43 @@ jobs:
               ant \
               cmake \
               ninja-build \
+              swig \
               proj-bin \
               libproj-dev
           elif [[ "${RUNNER_OS}" == "macOS" ]]; then
             brew update
-            brew install ant cmake ninja proj
+            brew install ant cmake ninja proj swig
           fi
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install -y ant cmake ninja proj
+          choco install -y ant cmake ninja swig
+
+      - name: Install PROJ with vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot) {
+            $vcpkgRoot = "$env:RUNNER_TEMP\vcpkg"
+          }
+
+          if (-not (Test-Path $vcpkgRoot)) {
+            git clone https://github.com/microsoft/vcpkg $vcpkgRoot
+          }
+
+          $vcpkgExe = Join-Path $vcpkgRoot "vcpkg.exe"
+          if (-not (Test-Path $vcpkgExe)) {
+            & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
+          }
+
+          & $vcpkgExe install proj:x64-windows
+
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Validate version supports CMake
         shell: bash
@@ -106,7 +131,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
             -DBUILD_TESTING=OFF \
             -DBUILD_APPS=OFF \
+            -DBUILD_PYTHON_BINDINGS=OFF \
             -DBUILD_JAVA_BINDINGS=ON \
+            -DBUILD_CSHARP_BINDINGS=OFF \
             -DGDAL_JAVA_INSTALL_DIR=share/java \
             -DGDAL_JAVA_JNI_INSTALL_DIR=lib/jni \
             "${EXTRA_ARGS[@]}"
@@ -124,7 +151,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
           New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
-          $projPrefix = "C:\ProgramData\chocolatey\lib\proj\tools\proj"
           $cmakeArgs = @(
             "-S", "$env:GDAL_SOURCE_DIR",
             "-B", $buildDir,
@@ -133,14 +159,14 @@ jobs:
             "-DCMAKE_INSTALL_PREFIX=$installDir",
             "-DBUILD_TESTING=OFF",
             "-DBUILD_APPS=OFF",
+            "-DBUILD_PYTHON_BINDINGS=OFF",
             "-DBUILD_JAVA_BINDINGS=ON",
+            "-DBUILD_CSHARP_BINDINGS=OFF",
             "-DGDAL_JAVA_INSTALL_DIR=share/java",
-            "-DGDAL_JAVA_JNI_INSTALL_DIR=lib/jni"
+            "-DGDAL_JAVA_JNI_INSTALL_DIR=lib/jni",
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake",
+            "-DVCPKG_TARGET_TRIPLET=x64-windows"
           )
-
-          if (Test-Path $projPrefix) {
-            $cmakeArgs += "-DCMAKE_PREFIX_PATH=$projPrefix"
-          }
 
           cmake @cmakeArgs
           cmake --build $buildDir --config Release --parallel
