@@ -57,8 +57,11 @@ Each platform produces one archive:
 
 Each archive is repackaged as a runtime bundle and contains:
 
-- `lib/` (native GDAL and dependency libraries; on Windows this also includes runtime files from install `bin`)
-- `share/` (including `share/proj/proj.db`, `share/gdal`, and related metadata files)
+- `lib/` (native GDAL and dependency libraries)
+- `share/` (including `share/proj`, `share/gdal`)
+
+Packaging trims non-runtime files from `share/`.
+
 
 ## Java runtime notes
 

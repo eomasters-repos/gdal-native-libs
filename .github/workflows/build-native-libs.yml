@@ -289,6 +289,11 @@ jobs:
           cp -a "${INSTALL_DIR}/lib/." "${PACKAGE_DIR}/lib/"
           cp -a "${INSTALL_DIR}/share/." "${PACKAGE_DIR}/share/"
 
+          rm -rf "${PACKAGE_DIR}/share/bash-completion" "${PACKAGE_DIR}/share/man"
+          if [[ "${RUNNER_OS}" == "macOS" ]] && [[ -d "${PACKAGE_DIR}/share/proj" ]]; then
+            find "${PACKAGE_DIR}/share/proj" -type f -name "*.tif" -delete
+          fi
+
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
           tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib share
 
@@ -324,6 +329,8 @@ jobs:
           }
 
           Copy-Item -Path "$installDir\share\*" -Destination "$packageDir\share" -Recurse -Force
+          Remove-Item -LiteralPath "$packageDir\share\bash-completion" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath "$packageDir\share\man" -Recurse -Force -ErrorAction SilentlyContinue
 
           $archive = "gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.zip"
           Compress-Archive -Path "$packageDir\lib", "$packageDir\share" -DestinationPath "$distDir\$archive" -Force
