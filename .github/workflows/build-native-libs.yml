@@ -200,41 +200,14 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p dist
-          PACKAGE_DIR="${GITHUB_WORKSPACE}/package"
           INSTALL_DIR="${GITHUB_WORKSPACE}/install"
-
-          rm -rf "$PACKAGE_DIR"
-          mkdir -p "$PACKAGE_DIR/lib"
-
-          if [[ ! -d "${INSTALL_DIR}/lib" ]]; then
-            echo "Expected install/lib to exist, but it was not found."
+          if [[ ! -d "${INSTALL_DIR}" ]]; then
+            echo "Expected install directory to exist, but it was not found."
             exit 1
-          fi
-
-          cp -a "${INSTALL_DIR}/lib/." "${PACKAGE_DIR}/lib/"
-
-          GDAL_PC_SOURCE=""
-          if [[ -f "${INSTALL_DIR}/lib/pkgconfig/gdal.pc" ]]; then
-            GDAL_PC_SOURCE="${INSTALL_DIR}/lib/pkgconfig/gdal.pc"
-          elif [[ -f "${INSTALL_DIR}/share/pkgconfig/gdal.pc" ]]; then
-            GDAL_PC_SOURCE="${INSTALL_DIR}/share/pkgconfig/gdal.pc"
-          fi
-
-          if [[ -z "$GDAL_PC_SOURCE" ]]; then
-            echo "gdal.pc not found in install tree."
-            exit 1
-          fi
-
-          rm -rf "${PACKAGE_DIR}/lib/pkgconfig"
-          cp "$GDAL_PC_SOURCE" "${PACKAGE_DIR}/lib/gdal.pc"
-
-          if [[ -f "${INSTALL_DIR}/bin/gdal-config" ]]; then
-            cp "${INSTALL_DIR}/bin/gdal-config" "${PACKAGE_DIR}/lib/gdal-config"
-            chmod +x "${PACKAGE_DIR}/lib/gdal-config"
           fi
 
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
-          tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib
+          tar -C "${INSTALL_DIR}" -czf "dist/${ARCHIVE}" .
 
       - name: Package native libs (Windows)
         if: runner.os == 'Windows'
@@ -242,56 +215,15 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $installDir = "$env:GITHUB_WORKSPACE\install"
-          $packageDir = "$env:GITHUB_WORKSPACE\package"
           $distDir = "$env:GITHUB_WORKSPACE\dist"
 
           New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-          if (Test-Path $packageDir) {
-            Remove-Item -LiteralPath $packageDir -Recurse -Force
+          if (-not (Test-Path $installDir)) {
+            throw "Expected install directory to exist, but it was not found."
           }
-          New-Item -ItemType Directory -Force -Path "$packageDir\lib" | Out-Null
-
-          $copiedNativeFiles = $false
-          if (Test-Path "$installDir\lib") {
-            Copy-Item -Path "$installDir\lib\*" -Destination "$packageDir\lib" -Recurse -Force
-            $copiedNativeFiles = $true
-          }
-          if (Test-Path "$installDir\bin") {
-            Copy-Item -Path "$installDir\bin\*" -Destination "$packageDir\lib" -Recurse -Force
-            $copiedNativeFiles = $true
-          }
-          if (-not $copiedNativeFiles) {
-            throw "Neither install\\lib nor install\\bin exists. Nothing to package."
-          }
-
-          if ((-not (Test-Path "$packageDir\lib\gdal-config")) -and (Test-Path "$installDir\bin\gdal-config")) {
-            Copy-Item -LiteralPath "$installDir\bin\gdal-config" -Destination "$packageDir\lib\gdal-config" -Force
-          }
-          if ((-not (Test-Path "$packageDir\lib\gdal-config.bat")) -and (Test-Path "$installDir\bin\gdal-config.bat")) {
-            Copy-Item -LiteralPath "$installDir\bin\gdal-config.bat" -Destination "$packageDir\lib\gdal-config.bat" -Force
-          }
-          if ((-not (Test-Path "$packageDir\lib\gdal-config.exe")) -and (Test-Path "$installDir\bin\gdal-config.exe")) {
-            Copy-Item -LiteralPath "$installDir\bin\gdal-config.exe" -Destination "$packageDir\lib\gdal-config.exe" -Force
-          }
-
-          $gdalPcSource = $null
-          if (Test-Path "$installDir\lib\pkgconfig\gdal.pc") {
-            $gdalPcSource = "$installDir\lib\pkgconfig\gdal.pc"
-          } elseif (Test-Path "$installDir\share\pkgconfig\gdal.pc") {
-            $gdalPcSource = "$installDir\share\pkgconfig\gdal.pc"
-          }
-
-          if (-not $gdalPcSource) {
-            throw "gdal.pc not found in install tree."
-          }
-
-          if (Test-Path "$packageDir\lib\pkgconfig") {
-            Remove-Item -LiteralPath "$packageDir\lib\pkgconfig" -Recurse -Force
-          }
-          Copy-Item -LiteralPath $gdalPcSource -Destination "$packageDir\lib\gdal.pc" -Force
 
           $archive = "gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.zip"
-          Compress-Archive -Path "$packageDir\lib" -DestinationPath "$distDir\$archive" -Force
+          Compress-Archive -Path "$installDir\*" -DestinationPath "$distDir\$archive" -Force
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

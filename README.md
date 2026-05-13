@@ -55,11 +55,11 @@ Each platform produces one archive:
 - `gdal-<tag>-macos-arm64.tar.gz`
 - `gdal-<tag>-windows-x64.zip`
 
-Each archive is repackaged as a minimal runtime bundle and contains only:
+Each archive now contains the original GDAL install tree produced by CMake (no repackaging), including directories such as:
 
-- `lib/` (native GDAL runtime and related library files from install `lib`)
-- `lib/gdal.pc`
-- `lib/gdal-config`
+- `bin/`
+- `lib/`
+- `share/` (for example `share/proj/proj.db`, `share/gdal`, and related metadata files)
 
 ## Java runtime notes
 
