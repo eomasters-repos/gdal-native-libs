@@ -160,6 +160,41 @@ jobs:
           cmake --build "$BUILD_DIR" --config Release --parallel
           cmake --install "$BUILD_DIR" --config Release
 
+      - name: Stage runtime data (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          INSTALL_DIR="${GITHUB_WORKSPACE}/install"
+          mkdir -p "${INSTALL_DIR}/share"
+
+          PROJ_DATA_SOURCE=""
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            if [[ -d "/usr/share/proj" ]]; then
+              PROJ_DATA_SOURCE="/usr/share/proj"
+            fi
+          elif [[ "${RUNNER_OS}" == "macOS" ]]; then
+            BREW_PROJ_PREFIX="$(brew --prefix proj)"
+            if [[ -d "${BREW_PROJ_PREFIX}/share/proj" ]]; then
+              PROJ_DATA_SOURCE="${BREW_PROJ_PREFIX}/share/proj"
+            fi
+          fi
+
+          if [[ -z "${PROJ_DATA_SOURCE}" ]]; then
+            echo "Unable to locate PROJ data directory on ${RUNNER_OS}."
+            exit 1
+          fi
+
+          rm -rf "${INSTALL_DIR}/share/proj"
+          mkdir -p "${INSTALL_DIR}/share/proj"
+          cp -a "${PROJ_DATA_SOURCE}/." "${INSTALL_DIR}/share/proj/"
+
+          if [[ ! -d "${INSTALL_DIR}/share/gdal" ]]; then
+            mkdir -p "${INSTALL_DIR}/share/gdal"
+            cp -a "${GDAL_SOURCE_DIR}/data/." "${INSTALL_DIR}/share/gdal/"
+          fi
+
       - name: Configure and build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -194,6 +229,36 @@ jobs:
           cmake --build $buildDir --config Release --parallel
           cmake --install $buildDir --config Release
 
+      - name: Stage runtime data (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installDir = "$env:GITHUB_WORKSPACE\install"
+          $projDataSource = "$env:VCPKG_INSTALLED\share\proj"
+          $projDataTarget = "$installDir\share\proj"
+          $gdalDataTarget = "$installDir\share\gdal"
+          $gdalDataSource = "$env:GDAL_SOURCE_DIR\data"
+
+          if (-not (Test-Path $projDataSource)) {
+            throw "PROJ data directory not found at $projDataSource"
+          }
+
+          New-Item -ItemType Directory -Force -Path "$installDir\share" | Out-Null
+          if (Test-Path $projDataTarget) {
+            Remove-Item -LiteralPath $projDataTarget -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path $projDataTarget | Out-Null
+          Copy-Item -Path "$projDataSource\*" -Destination $projDataTarget -Recurse -Force
+
+          if (-not (Test-Path $gdalDataTarget)) {
+            if (-not (Test-Path $gdalDataSource)) {
+              throw "GDAL data source directory not found at $gdalDataSource"
+            }
+            New-Item -ItemType Directory -Force -Path $gdalDataTarget | Out-Null
+            Copy-Item -Path "$gdalDataSource\*" -Destination $gdalDataTarget -Recurse -Force
+          }
+
       - name: Package native libs (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -201,13 +266,31 @@ jobs:
           set -euxo pipefail
           mkdir -p dist
           INSTALL_DIR="${GITHUB_WORKSPACE}/install"
+          PACKAGE_DIR="${GITHUB_WORKSPACE}/package"
+
           if [[ ! -d "${INSTALL_DIR}" ]]; then
             echo "Expected install directory to exist, but it was not found."
             exit 1
           fi
 
+          rm -rf "${PACKAGE_DIR}"
+          mkdir -p "${PACKAGE_DIR}/lib" "${PACKAGE_DIR}/share"
+
+          if [[ ! -d "${INSTALL_DIR}/lib" ]]; then
+            echo "Expected install/lib to exist, but it was not found."
+            exit 1
+          fi
+
+          if [[ ! -d "${INSTALL_DIR}/share" ]]; then
+            echo "Expected install/share to exist, but it was not found."
+            exit 1
+          fi
+
+          cp -a "${INSTALL_DIR}/lib/." "${PACKAGE_DIR}/lib/"
+          cp -a "${INSTALL_DIR}/share/." "${PACKAGE_DIR}/share/"
+
           ARCHIVE="gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.tar.gz"
-          tar -C "${INSTALL_DIR}" -czf "dist/${ARCHIVE}" .
+          tar -C "${PACKAGE_DIR}" -czf "dist/${ARCHIVE}" lib share
 
       - name: Package native libs (Windows)
         if: runner.os == 'Windows'
@@ -216,14 +299,34 @@ jobs:
           $ErrorActionPreference = "Stop"
           $installDir = "$env:GITHUB_WORKSPACE\install"
           $distDir = "$env:GITHUB_WORKSPACE\dist"
+          $packageDir = "$env:GITHUB_WORKSPACE\package"
 
           New-Item -ItemType Directory -Force -Path $distDir | Out-Null
           if (-not (Test-Path $installDir)) {
             throw "Expected install directory to exist, but it was not found."
           }
 
+          if (Test-Path $packageDir) {
+            Remove-Item -LiteralPath $packageDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path "$packageDir\lib" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$packageDir\share" | Out-Null
+
+          if (-not (Test-Path "$installDir\share")) {
+            throw "Expected install\\share to exist, but it was not found."
+          }
+
+          if (Test-Path "$installDir\lib") {
+            Copy-Item -Path "$installDir\lib\*" -Destination "$packageDir\lib" -Recurse -Force
+          }
+          if (Test-Path "$installDir\bin") {
+            Copy-Item -Path "$installDir\bin\*" -Destination "$packageDir\lib" -Recurse -Force
+          }
+
+          Copy-Item -Path "$installDir\share\*" -Destination "$packageDir\share" -Recurse -Force
+
           $archive = "gdal-${{ inputs.gdal_tag }}-${{ matrix.platform.name }}.zip"
-          Compress-Archive -Path "$installDir\*" -DestinationPath "$distDir\$archive" -Force
+          Compress-Archive -Path "$packageDir\lib", "$packageDir\share" -DestinationPath "$distDir\$archive" -Force
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
